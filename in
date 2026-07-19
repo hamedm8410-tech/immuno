@@ -1,0 +1,208 @@
+// ================================================================
+// ربات تلگرام «راه‌های عصبی» — ساخته‌شده با Telegraf (Node.js)
+// نسخه: هر "راه" می‌تواند چند "مرحله" جداگانه داشته باشد
+// دکمه «برو بریم» → مرحله ۱ (عکس+کپشن+ویس) → «بریم مرحله بعد؟» → مرحله ۲ و ...
+// ================================================================
+
+const { Telegraf, Markup } = require('telegraf');
+
+const BOT_TOKEN = process.env.BOT_TOKEN;
+
+if (!BOT_TOKEN) {
+  console.error('⚠️ توکن ربات پیدا نشد. آن را در بخش Secrets با نام BOT_TOKEN اضافه کنید.');
+  process.exit(1);
+}
+
+const bot = new Telegraf(BOT_TOKEN);
+
+// ================== ۱. اطلاعات ده‌گانه ==================
+// هر راه یک "label" دارد و یک آرایه "steps" شامل یک یا چند مرحله.
+// هر مرحله: text (کپشن) + imageUrl + voiceUrl (اختیاری)
+const pathsData = [
+  {
+    label: "راه اول",
+    steps: [
+      {
+        text: `به ناحیه‌ای از پوست که حس آن توسط یک عصب نخاعی مشخص تأمین می‌شود، درماتوم می‌گویند.`,
+        imageUrl: "https://uploadkon.ir/uploads/ed3018_260101.jpg",
+        voiceUrl: null
+      },
+      {
+        text: `نکته: شناخت نقشه درماتومی در معاینات نورولوژیک اهمیت زیادی دارد، زیرا به پزشک کمک می‌کند محل ضایعه عصبی را دقیق‌تر مشخص کند.`,
+        imageUrl: "https://uploadkon.ir/uploads/ed3018_260101.jpg",
+        voiceUrl: null
+      },
+      {
+        text: `اگر بخشی از بدن دچار بی‌حسی یا کاهش حس شود، نورولوژیست با تطبیق محل اختلال حسی با نقشه درماتوم‌ها می‌تواند تشخیص دهد کدام عصب نخاعی درگیر شده است.`,
+        imageUrl: "https://uploadkon.ir/uploads/ed3018_260101.jpg",
+        voiceUrl: null
+      }
+    ]
+  },
+  {
+    label: "راه دوم",
+    steps: [
+      { text: `توضیح راه دوم...`, imageUrl: "https://via.placeholder.com/400?text=Image2", voiceUrl: null }
+    ]
+  },
+  {
+    label: "راه سوم",
+    steps: [
+      { text: `توضیح راه سوم...`, imageUrl: "https://via.placeholder.com/400?text=Image3", voiceUrl: null }
+    ]
+  },
+  {
+    label: "راه چهارم",
+    steps: [
+      { text: `توضیح راه چهارم...`, imageUrl: "https://via.placeholder.com/400?text=Image4", voiceUrl: null }
+    ]
+  },
+  {
+    label: "راه پنجم",
+    steps: [
+      { text: `توضیح راه پنجم...`, imageUrl: "https://via.placeholder.com/400?text=Image5", voiceUrl: null }
+    ]
+  },
+  {
+    label: "راه ششم",
+    steps: [
+      { text: `توضیح راه ششم...`, imageUrl: "https://via.placeholder.com/400?text=Image6", voiceUrl: null }
+    ]
+  },
+  {
+    label: "راه هفتم",
+    steps: [
+      { text: `توضیح راه هفتم...`, imageUrl: "https://via.placeholder.com/400?text=Image7", voiceUrl: null }
+    ]
+  },
+  {
+    label: "راه هشتم",
+    steps: [
+      { text: `توضیح راه هشتم...`, imageUrl: "https://via.placeholder.com/400?text=Image8", voiceUrl: null }
+    ]
+  },
+  {
+    label: "راه نهم",
+    steps: [
+      { text: `توضیح راه نهم...`, imageUrl: "https://via.placeholder.com/400?text=Image9", voiceUrl: null }
+    ]
+  },
+  {
+    label: "راه دهم",
+    steps: [
+      { text: `توضیح راه دهم...`, imageUrl: "https://via.placeholder.com/400?text=Image10", voiceUrl: null }
+    ]
+  }
+];
+
+// نگهداری وضعیت هر کاربر: کدام راه و کدام مرحله
+const userState = {};
+
+// ================== ۲. کیبوردها ==================
+
+function mainMenuKeyboard() {
+  const labels = pathsData.map(p => p.label);
+  const rows = [];
+  for (let i = 0; i < labels.length; i += 2) {
+    rows.push(labels.slice(i, i + 2));
+  }
+  return Markup.keyboard(rows).resize();
+}
+
+function startKeyboard() {
+  return Markup.keyboard([
+    ['🚀 برو بریم'],
+    ['↩️ بازگشت به منو']
+  ]).resize();
+}
+
+function nextKeyboard() {
+  return Markup.keyboard([
+    ['✅ بریم مرحله بعد'],
+    ['↩️ بازگشت به منو']
+  ]).resize();
+}
+
+function endKeyboard() {
+  return Markup.keyboard([
+    ['↩️ بازگشت به منو']
+  ]).resize();
+}
+
+// ================== ۳. ارسال یک مرحله (عکس + کپشن + ویس) ==================
+
+async function sendStepContent(ctx, pathIndex, stepIndex) {
+  const path = pathsData[pathIndex];
+  const step = path.steps[stepIndex];
+
+  // عکس همراه با متن در کپشن (کپشن تلگرام حداکثر ۱۰۲۴ کاراکتر است)
+  try {
+    await ctx.replyWithPhoto(step.imageUrl, { caption: step.text });
+  } catch (err) {
+    await ctx.reply(step.text);
+  }
+
+  // ویس (در صورت وجود)
+  if (step.voiceUrl) {
+    try {
+      await ctx.replyWithVoice(step.voiceUrl);
+    } catch (err) {
+      await ctx.reply('⚠️ صدا بارگذاری نشد.');
+    }
+  }
+
+  // آیا مرحله بعدی در همین راه وجود دارد؟
+  if (stepIndex < path.steps.length - 1) {
+    await ctx.reply('بریم مرحله بعد؟', nextKeyboard());
+  } else {
+    await ctx.reply(`🎉 مراحل «${path.label}» تمام شد!`, endKeyboard());
+  }
+}
+
+// ================== ۴. دستورات ==================
+
+bot.start((ctx) => {
+  delete userState[ctx.from.id];
+  ctx.reply('سلام! یکی از راه‌ها را انتخاب کنید:', mainMenuKeyboard());
+});
+
+// وقتی کاربر روی یکی از دکمه‌های ۱۰ راه بزند
+pathsData.forEach((path, pathIndex) => {
+  bot.hears(path.label, (ctx) => {
+    userState[ctx.from.id] = { pathIndex, stepIndex: 0 };
+    ctx.reply(`${path.label} را انتخاب کردید.`, startKeyboard());
+  });
+});
+
+// دکمه «برو بریم» → شروع از مرحله اول همان راه
+bot.hears('🚀 برو بریم', async (ctx) => {
+  const state = userState[ctx.from.id];
+  if (!state) {
+    return ctx.reply('لطفاً اول یکی از راه‌ها را انتخاب کنید.', mainMenuKeyboard());
+  }
+  await sendStepContent(ctx, state.pathIndex, state.stepIndex);
+});
+
+// دکمه «بریم مرحله بعد» → مرحله بعدی همان راه (نه راه بعدی!)
+bot.hears('✅ بریم مرحله بعد', async (ctx) => {
+  const state = userState[ctx.from.id];
+  if (!state) {
+    return ctx.reply('لطفاً اول یکی از راه‌ها را انتخاب کنید.', mainMenuKeyboard());
+  }
+  state.stepIndex += 1;
+  await sendStepContent(ctx, state.pathIndex, state.stepIndex);
+});
+
+// بازگشت به منوی اصلی
+bot.hears('↩️ بازگشت به منو', (ctx) => {
+  delete userState[ctx.from.id];
+  ctx.reply('یکی از راه‌ها را انتخاب کنید:', mainMenuKeyboard());
+});
+
+// ================== ۵. اجرای ربات ==================
+
+bot.launch();
+console.log('✅ ربات فعال است...');
+
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
